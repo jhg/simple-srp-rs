@@ -101,7 +101,7 @@ pub struct Client<G: Group, D: Digest, const SALT_LEN: usize = 64, const PRIVATE
 }
 
 impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> Client<G, D, SALT_LEN, PRIVATE_KEY_LEN> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Client {
             d: PhantomData,
         }
@@ -176,7 +176,7 @@ pub struct Server<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize = 64> {
 }
 
 impl<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize> Server<G, D, PRIVATE_KEY_LEN> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Server {
             d: PhantomData,
         }
