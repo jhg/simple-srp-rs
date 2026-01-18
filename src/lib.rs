@@ -1,5 +1,7 @@
 //! # Simplify SRP authentication.
 //!
+//! It uses [`srp`](https://crates.io/crates/srp) crate under the hood.
+//!
 //! Sign up flow:
 //! 1. [`Client::sign_up`] - client creates salt and verifier for registration.
 //!
@@ -34,7 +36,7 @@
 //! let (server_hello, server_keypair) = Server::<srp::groups::G4096, sha2::Sha512>::hello_reply(
 //!     creds.salt.clone(),
 //!     creds.verifier.clone(),
-//! );
+//! ).unwrap();
 //!
 //! // Client creates evidence
 //! let (login_evidence, client_session) = Client::<srp::groups::G4096, sha2::Sha512>::create_evidence(
@@ -43,7 +45,7 @@
 //!     server_hello.salt.clone(),
 //!     server_hello.server.clone(),
 //!     client_keypair,
-//! );
+//! ).unwrap();
 //!
 //! // Server authenticates
 //! let auth_result = Server::<srp::groups::G4096, sha2::Sha512>::authenticate(
@@ -60,12 +62,15 @@
 //! assert!(server_verification.is_ok());
 //! ```
 
+mod error;
+
+pub use error::SimpleSrpError;
+
 use std::marker::PhantomData;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use srp::{ClientVerifier, Group};
-use srp::AuthError;
 
 // To simplify work with hex strings
 
@@ -161,6 +166,7 @@ impl<G: Group, D: Digest> Client<G, D> {
                 password.as_bytes(),
                 &salt
             );
+
         SignupCredentials {
             username,
             salt: hex::encode(salt),
@@ -175,6 +181,7 @@ impl<G: Group, D: Digest> Client<G, D> {
         rand::rng().fill_bytes(&mut private);
         let public = srp::Client::<G, D>::new()
             .compute_public_ephemeral(&private);
+
         (
             ClientHello {
                 username,
@@ -187,25 +194,30 @@ impl<G: Group, D: Digest> Client<G, D> {
         )
     }
 
-    pub fn create_evidence(username: String, password: String, salt: String, server: String, pair: KeyPair) -> (LoginEvidence, ClientVerifier<D>) {
+    pub fn create_evidence(
+        username: String, password: String,
+        salt: String, server: String, pair: KeyPair
+    ) -> Result<(LoginEvidence, ClientVerifier<D>), SimpleSrpError> {
         let client = srp::Client::<G, D>::new();
         let session = client.process_reply(
             pair.private.as_bytes(),
             username.as_bytes(),
             password.as_bytes(),
-            &hex::decode(salt).unwrap(),
-            &hex::decode(server).unwrap(),
-        ).unwrap();
-        (
+            &hex::decode(salt)?,
+            &hex::decode(server)?,
+        )?;
+
+        Ok((
             LoginEvidence {
                 evidence: hex::encode(session.proof()),
             },
             session,
-        )
+        ))
     }
 
-    pub fn verify_server(expected: &ClientVerifier<D>, server_evidence: String) -> Result<&[u8], AuthError> {
-        expected.verify_server(&hex::decode(server_evidence).unwrap())
+    pub fn verify_server(expected: &ClientVerifier<D>, server_evidence: String) -> Result<&[u8], SimpleSrpError> {
+        expected.verify_server(&hex::decode(server_evidence)?)
+            .map_err(SimpleSrpError::from)
     }
 }
 
@@ -214,12 +226,13 @@ pub struct Server<G: Group, D: Digest> {
 }
 
 impl<G: Group, D: Digest> Server<G, D> {
-    pub fn hello_reply(salt: String, verifier: String) -> (ServerHello, KeyPair) {
+    pub fn hello_reply(salt: String, verifier: String) -> Result<(ServerHello, KeyPair), SimpleSrpError> {
         let mut private = [0u8; 64];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Server::<G, D>::new()
-            .compute_public_ephemeral(&private, &hex::decode(verifier).unwrap());
-        (
+            .compute_public_ephemeral(&private, &hex::decode(verifier)?);
+
+        Ok((
             ServerHello {
                 salt,
                 server: hex::encode(&public),
@@ -228,19 +241,23 @@ impl<G: Group, D: Digest> Server<G, D> {
                 private: Vec::from(private).into(),
                 public: public.into(),
             },
-        )
+        ))
     }
 
-    pub fn authenticate(username: String, salt: String, verifier: String, pair: KeyPair, client: String, evidence: String) -> Result<AuthResult, AuthError> {
+    pub fn authenticate(
+        username: String, salt: String, verifier: String,
+        pair: KeyPair, client: String, evidence: String
+    ) -> Result<AuthResult, SimpleSrpError> {
         let server = srp::Server::<G, D>::new();
         let session = server.process_reply(
             username.as_bytes(),
-            &hex::decode(salt).unwrap(),
+            &hex::decode(salt)?,
             pair.private.as_bytes(),
-            &hex::decode(verifier).unwrap(),
-            &hex::decode(client).unwrap(),
+            &hex::decode(verifier)?,
+            &hex::decode(client)?,
         )?;
-        session.verify_client(&hex::decode(evidence).unwrap())?;
+        session.verify_client(&hex::decode(evidence)?)?;
+
         Ok(AuthResult {
             result: true,
             evidence: hex::encode(session.proof()),
