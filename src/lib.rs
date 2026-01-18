@@ -1,4 +1,4 @@
-//! Simplify SRP authentication.
+//! # Simplify SRP authentication.
 //!
 //! Sign up flow:
 //! 1. [`Client::sign_up`] - client creates salt and verifier for registration.
@@ -15,6 +15,50 @@
 //! And used structs can be serialized/deserialized for communication.
 //!
 //! That's all, it's simple!
+//!
+//! ## Example
+//!
+//! An example to help you to get started quickly. It's all together here for simplicity only.
+//!
+//! ```rust
+//! use simple_srp::{Client, Server};
+//!
+//! let username = "testuser".to_string();
+//! let password = "testpass".to_string();
+//!
+//! // Registration
+//! let creds = Client::<srp::groups::G4096, sha2::Sha512>::sign_up(username.clone(), password.clone());
+//!
+//! // Login Hello
+//! let (client_hello, client_keypair) = Client::<srp::groups::G4096, sha2::Sha512>::login_hello(username.clone());
+//! let (server_hello, server_keypair) = Server::<srp::groups::G4096, sha2::Sha512>::hello_reply(
+//!     creds.salt.clone(),
+//!     creds.verifier.clone(),
+//! );
+//!
+//! // Client creates evidence
+//! let (login_evidence, client_session) = Client::<srp::groups::G4096, sha2::Sha512>::create_evidence(
+//!     username.clone(),
+//!     password.clone(),
+//!     server_hello.salt.clone(),
+//!     server_hello.server.clone(),
+//!     client_keypair,
+//! );
+//!
+//! // Server authenticates
+//! let auth_result = Server::<srp::groups::G4096, sha2::Sha512>::authenticate(
+//!     username.clone(),
+//!     creds.salt.clone(),
+//!     creds.verifier.clone(),
+//!     server_keypair,
+//!     client_hello.client.clone(),
+//!     login_evidence.evidence.clone(),
+//! ).unwrap();
+//!
+//! // Client verifies server evidence
+//! let server_verification = Client::<srp::groups::G4096, sha2::Sha512>::verify_server(&client_session, auth_result.evidence.clone());
+//! assert!(server_verification.is_ok());
+//! ```
 
 use std::marker::PhantomData;
 use rand::RngCore;
@@ -201,48 +245,5 @@ impl<G: Group, D: Digest> Server<G, D> {
             result: true,
             evidence: hex::encode(session.proof()),
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_srp_flow() {
-        let username = "testuser".to_string();
-        let password = "testpass".to_string();
-
-        // Registration
-        let creds = Client::<srp::groups::G4096, sha2::Sha512>::sign_up(username.clone(), password.clone());
-
-        // Login Hello
-        let (client_hello, client_keypair) = Client::<srp::groups::G4096, sha2::Sha512>::login_hello(username.clone());
-        let (server_hello, server_keypair) = Server::<srp::groups::G4096, sha2::Sha512>::hello_reply(
-            creds.salt.clone(),
-            creds.verifier.clone(),
-        );
-
-        // Client creates evidence
-        let (login_evidence, client_session) = Client::<srp::groups::G4096, sha2::Sha512>::create_evidence(
-            username.clone(),
-            password.clone(),
-            server_hello.salt.clone(),
-            server_hello.server.clone(),
-            client_keypair,
-        );
-
-        // Server authenticates
-        let auth_result = Server::<srp::groups::G4096, sha2::Sha512>::authenticate(
-            username.clone(),
-            creds.salt.clone(),
-            creds.verifier.clone(),
-            server_keypair,
-            client_hello.client.clone(),
-            login_evidence.evidence.clone(),
-        ).unwrap();
-
-        // Client verifies server evidence
-        let server_verification = Client::<srp::groups::G4096, sha2::Sha512>::verify_server(&client_session, auth_result.evidence.clone());
-        assert!(server_verification.is_ok());
     }
 }
