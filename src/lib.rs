@@ -23,23 +23,26 @@
 //! An example to help you to get started quickly. It's all together here for simplicity only.
 //!
 //! ```rust
-//! use simple_srp::{Client, Server};
+//! use simple_srp::{Client, Server, groups};
 //!
 //! let username = "testuser".to_string();
 //! let password = "testpass".to_string();
 //!
+//! let client = Client::<groups::G4096, sha2::Sha512>::new();
+//! let server = Server::<groups::G4096, sha2::Sha512>::new();
+//!
 //! // Registration
-//! let creds = Client::<srp::groups::G4096, sha2::Sha512>::sign_up(username.clone(), password.clone());
+//! let creds = client.sign_up(username.clone(), password.clone());
 //!
 //! // Login Hello
-//! let (client_hello, client_keypair) = Client::<srp::groups::G4096, sha2::Sha512>::login_hello(username.clone());
-//! let (server_hello, server_keypair) = Server::<srp::groups::G4096, sha2::Sha512>::hello_reply(
+//! let (client_hello, client_keypair) = client.login_hello(username.clone());
+//! let (server_hello, server_keypair) = server.hello_reply(
 //!     creds.salt.clone(),
 //!     creds.verifier.clone(),
 //! ).unwrap();
 //!
 //! // Client creates evidence
-//! let (login_evidence, client_session) = Client::<srp::groups::G4096, sha2::Sha512>::create_evidence(
+//! let (login_evidence, client_session) = client.create_evidence(
 //!     username.clone(),
 //!     password.clone(),
 //!     server_hello.salt.clone(),
@@ -48,7 +51,7 @@
 //! ).unwrap();
 //!
 //! // Server authenticates
-//! let auth_result = Server::<srp::groups::G4096, sha2::Sha512>::authenticate(
+//! let auth_result = server.authenticate(
 //!     username.clone(),
 //!     creds.salt.clone(),
 //!     creds.verifier.clone(),
@@ -58,13 +61,14 @@
 //! ).unwrap();
 //!
 //! // Client verifies server evidence
-//! let server_verification = Client::<srp::groups::G4096, sha2::Sha512>::verify_server(&client_session, auth_result.evidence.clone());
+//! let server_verification = client.verify_server(&client_session, auth_result.evidence.clone());
 //! assert!(server_verification.is_ok());
 //! ```
 
 mod error;
 
 pub use error::SimpleSrpError;
+pub use srp::groups;
 
 use std::marker::PhantomData;
 use rand::RngCore;
@@ -77,16 +81,19 @@ use srp::{ClientVerifier, Group};
 pub struct CryptoString(Vec<u8>);
 
 impl CryptoString {
+    #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         self.0.as_slice()
     }
 
+    #[inline]
     pub fn hex(self) -> String {
         hex::encode(self.0)
     }
 }
 
 impl From<Vec<u8>> for CryptoString {
+    #[inline]
     fn from(value: Vec<u8>) -> Self {
         CryptoString(value)
     }
@@ -95,6 +102,7 @@ impl From<Vec<u8>> for CryptoString {
 impl TryFrom<String> for CryptoString {
     type Error = hex::FromHexError;
 
+    #[inline]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         hex::decode(value).map(CryptoString::from)
     }
@@ -108,6 +116,7 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
+    #[inline]
     pub fn from_parts(private: String, public: String) -> Result<Self, hex::FromHexError> {
         Ok(KeyPair {
             private: CryptoString::try_from(private)?,
@@ -157,7 +166,13 @@ pub struct Client<G: Group, D: Digest> {
 }
 
 impl<G: Group, D: Digest> Client<G, D> {
-    pub fn sign_up(username: String, password: String) -> SignupCredentials {
+    pub fn new() -> Self {
+        Client {
+            d: PhantomData,
+        }
+    }
+
+    pub fn sign_up(&self, username: String, password: String) -> SignupCredentials {
         let mut salt = [0u8; 64];
         rand::rng().fill_bytes(&mut salt);
         let verifier = srp::Client::<G, D>::new()
@@ -174,9 +189,8 @@ impl<G: Group, D: Digest> Client<G, D> {
         }
     }
 
-    // Client
 
-    pub fn login_hello(username: String) -> (ClientHello, KeyPair) {
+    pub fn login_hello(&self, username: String) -> (ClientHello, KeyPair) {
         let mut private = [0u8; 64];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Client::<G, D>::new()
@@ -195,6 +209,7 @@ impl<G: Group, D: Digest> Client<G, D> {
     }
 
     pub fn create_evidence(
+        &self,
         username: String, password: String,
         salt: String, server: String, pair: KeyPair
     ) -> Result<(LoginEvidence, ClientVerifier<D>), SimpleSrpError> {
@@ -215,7 +230,7 @@ impl<G: Group, D: Digest> Client<G, D> {
         ))
     }
 
-    pub fn verify_server(expected: &ClientVerifier<D>, server_evidence: String) -> Result<&[u8], SimpleSrpError> {
+    pub fn verify_server<'a>(&self, expected: &'a ClientVerifier<D>, server_evidence: String) -> Result<&'a [u8], SimpleSrpError> {
         expected.verify_server(&hex::decode(server_evidence)?)
             .map_err(SimpleSrpError::from)
     }
@@ -226,7 +241,13 @@ pub struct Server<G: Group, D: Digest> {
 }
 
 impl<G: Group, D: Digest> Server<G, D> {
-    pub fn hello_reply(salt: String, verifier: String) -> Result<(ServerHello, KeyPair), SimpleSrpError> {
+    pub fn new() -> Self {
+        Server {
+            d: PhantomData,
+        }
+    }
+
+    pub fn hello_reply(&self, salt: String, verifier: String) -> Result<(ServerHello, KeyPair), SimpleSrpError> {
         let mut private = [0u8; 64];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Server::<G, D>::new()
@@ -245,6 +266,7 @@ impl<G: Group, D: Digest> Server<G, D> {
     }
 
     pub fn authenticate(
+        &self,
         username: String, salt: String, verifier: String,
         pair: KeyPair, client: String, evidence: String
     ) -> Result<AuthResult, SimpleSrpError> {
