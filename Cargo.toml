@@ -10,6 +10,8 @@ authors = ["Jesus Hernandez <jesushdez@protonmail.com>"]
 edition = "2024"
 repository = "https://github.com/jhg/simple-srp-rs"
 exclude = [
+    ".idea/*",
+    ".DS_Store",
     "Cargo.lock",
     "target/*",
     ".gitignore",
