@@ -1,0 +1,17 @@
+[package]
+name = "simple-srp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+srp = "0.7.0-rc.0"
+sha2 = "0.11.0-rc.3"
+rand = {  version = "0.10.0-rc.6", features = [] }
+getrandom = { version = "0.4.0-rc.0", features = ["wasm_js"] }
+serde = { version = "1.0.228", features = ["derive"] }
+hex = "0.4.3"
+
+[profile.release]
+strip = true
+opt-level = 3
+lto = true
