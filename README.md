@@ -1,6 +1,8 @@
 # Simplify SRP authentication.
 
-It uses [`srp`](https://crates.io/crates/srp) crate under the hood.
+It uses [`srp`](https://crates.io/crates/srp) crate under the hood, and can compile for WebAssembly.
+
+Check security warnings there please. USE AT YOUR OWN RISK!
 
 Sign up flow:
 1. [`Client::sign_up`] - client creates salt and verifier for registration.

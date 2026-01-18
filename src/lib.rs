@@ -1,8 +1,7 @@
 #![doc = include_str!("../README.md")]
 
-mod error;
+pub mod errors;
 
-pub use error::SimpleSrpError;
 pub use srp::groups;
 
 use std::marker::PhantomData;
@@ -10,6 +9,8 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use srp::{ClientVerifier, Group};
+
+use errors::SimpleSrpError;
 
 // To simplify work with hex strings
 
