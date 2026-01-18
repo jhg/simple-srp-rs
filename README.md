@@ -25,13 +25,13 @@ That's all, it's simple!
 An example to help you to get started quickly. It's all together here for simplicity only.
 
 ```rust
-use simple_srp::{Client, Server, groups};
+use simple_srp::{SrpClient, SrpServer, groups};
 
 let username = "testuser".to_string();
 let password = "testpass".to_string();
 
-let client = Client::<groups::G4096, sha2::Sha512>::new();
-let server = Server::<groups::G4096, sha2::Sha512>::new();
+let client = SrpClient::<groups::G4096, sha2::Sha512>::new();
+let server = SrpServer::<groups::G4096, sha2::Sha512>::new();
 
 // Registration
 let creds = client.sign_up(username.clone(), password.clone());

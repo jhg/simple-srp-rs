@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod errors;
+mod utils;
 
 pub use srp::groups;
 
@@ -11,68 +12,20 @@ use sha2::Digest;
 use srp::{ClientVerifier, Group};
 
 use errors::SimpleSrpError;
-
-// To simplify work with hex strings
-
-pub struct CryptoString(Vec<u8>);
-
-impl CryptoString {
-    #[inline]
-    pub const fn as_bytes(&self) -> &[u8] {
-        self.0.as_slice()
-    }
-
-    #[inline]
-    pub fn hex(self) -> String {
-        hex::encode(self.0)
-    }
-}
-
-impl From<Vec<u8>> for CryptoString {
-    #[inline]
-    fn from(value: Vec<u8>) -> Self {
-        CryptoString(value)
-    }
-}
-
-impl TryFrom<String> for CryptoString {
-    type Error = hex::FromHexError;
-
-    #[inline]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        hex::decode(value).map(CryptoString::from)
-    }
-}
-
-// For keys
-
-pub struct KeyPair {
-    pub private: CryptoString,
-    pub public: CryptoString,
-}
-
-impl KeyPair {
-    #[inline]
-    pub fn from_parts(private: String, public: String) -> Result<Self, hex::FromHexError> {
-        Ok(KeyPair {
-            private: CryptoString::try_from(private)?,
-            public: CryptoString::try_from(public)?,
-        })
-    }
-}
+use utils::KeyPair;
 
 // Structs to communicate client-server SRP data
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SignupCredentials {
-    pub username: String,
+pub struct SignupCredentials<U: AsRef<str> = String> {
+    pub username: U,
     pub salt: String,
     pub verifier: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ClientHello {
-    pub username: String,
+pub struct ClientHello<U: AsRef<str> = String> {
+    pub username: U,
     // Client public key (A)
     pub client: String,
 }
@@ -97,24 +50,24 @@ pub struct AuthResult {
     pub evidence: String,
 }
 
-pub struct Client<G: Group, D: Digest, const SALT_LEN: usize = 64, const PRIVATE_KEY_LEN: usize = 64> {
+pub struct SrpClient<G: Group, D: Digest, const SALT_LEN: usize = 64, const PRIVATE_KEY_LEN: usize = 64> {
     d: PhantomData<(G, D)>,
 }
 
-impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> Client<G, D, SALT_LEN, PRIVATE_KEY_LEN> {
+impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> SrpClient<G, D, SALT_LEN, PRIVATE_KEY_LEN> {
     pub const fn new() -> Self {
-        Client {
+        SrpClient {
             d: PhantomData,
         }
     }
 
-    pub fn sign_up(&self, username: String, password: String) -> SignupCredentials {
+    pub fn sign_up<U: AsRef<str>, P: AsRef<str>>(&self, username: U, password: P) -> SignupCredentials<U> {
         let mut salt = [0u8; SALT_LEN];
         rand::rng().fill_bytes(&mut salt);
         let verifier = srp::Client::<G, D>::new()
             .compute_verifier(
-                username.as_bytes(),
-                password.as_bytes(),
+                username.as_ref().as_bytes(),
+                password.as_ref().as_bytes(),
                 &salt
             );
 
@@ -126,7 +79,7 @@ impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> C
     }
 
 
-    pub fn login_hello(&self, username: String) -> (ClientHello, KeyPair) {
+    pub fn login_hello<U: AsRef<str>>(&self, username: U) -> (ClientHello<U>, KeyPair) {
         let mut private = [0u8; PRIVATE_KEY_LEN];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Client::<G, D>::new()
@@ -144,16 +97,16 @@ impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> C
         )
     }
 
-    pub fn create_evidence(
+    pub fn create_evidence<U: AsRef<str>, P: AsRef<str>>(
         &self,
-        username: String, password: String,
+        username: U, password: P,
         salt: String, server: String, pair: KeyPair
     ) -> Result<(LoginEvidence, ClientVerifier<D>), SimpleSrpError> {
         let client = srp::Client::<G, D>::new();
         let session = client.process_reply(
             pair.private.as_bytes(),
-            username.as_bytes(),
-            password.as_bytes(),
+            username.as_ref().as_bytes(),
+            password.as_ref().as_bytes(),
             &hex::decode(salt)?,
             &hex::decode(server)?,
         )?;
@@ -172,13 +125,13 @@ impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> C
     }
 }
 
-pub struct Server<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize = 64> {
+pub struct SrpServer<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize = 64> {
     d: PhantomData<(G, D)>,
 }
 
-impl<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize> Server<G, D, PRIVATE_KEY_LEN> {
+impl<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize> SrpServer<G, D, PRIVATE_KEY_LEN> {
     pub const fn new() -> Self {
-        Server {
+        SrpServer {
             d: PhantomData,
         }
     }
