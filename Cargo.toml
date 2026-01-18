@@ -13,5 +13,5 @@ hex = "0.4.3"
 
 [profile.release]
 strip = true
-opt-level = 3
+opt-level = 'z'
 lto = true

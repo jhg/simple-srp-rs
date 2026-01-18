@@ -1,12 +1,16 @@
 //! Simplify SRP authentication.
 //!
-//! Flow:
+//! Sign up flow:
 //! 1. [`Client::sign_up`] - client creates salt and verifier for registration.
-//! 2. [`Client::login_hello`] - client creates login hello message with public key.
-//! 3. [`Server::hello_reply`] - server responds with salt and its public key.
-//! 4. [`Client::create_evidence`] - client creates evidence message to prove knowledge of password.
-//! 5. [`Server::authenticate`] - server verifies client evidence and responds with its own evidence.
-//! 6. [`Client::verify_server`] - client verifies server evidence to complete authentication.
+//!
+//! And send it to server, to store it for future logins.
+//!
+//! Login flow:
+//! 1. [`Client::login_hello`] - client creates login hello message with public key.
+//! 2. [`Server::hello_reply`] - server responds with salt and its public key.
+//! 3. [`Client::create_evidence`] - client creates evidence message to prove knowledge of password.
+//! $. [`Server::authenticate`] - server verifies client evidence and responds with its own evidence.
+//! 5. [`Client::verify_server`] - client verifies server evidence to complete authentication.
 //!
 //! And used structs can be serialized/deserialized for communication.
 //!
