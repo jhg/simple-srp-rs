@@ -1,7 +1,14 @@
 [package]
 name = "simple-srp"
 version = "0.1.0"
+description = "Simplify usage of srp crate"
 edition = "2024"
+
+exclude = [
+    "Cargo.lock",
+    "target/*",
+    ".gitignore",
+]
 
 [dependencies]
 srp = "0.7.0-rc.0"
