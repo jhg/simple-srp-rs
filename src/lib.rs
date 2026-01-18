@@ -96,11 +96,11 @@ pub struct AuthResult {
     pub evidence: String,
 }
 
-pub struct Client<G: Group, D: Digest> {
+pub struct Client<G: Group, D: Digest, const SALT_LEN: usize = 64, const PRIVATE_KEY_LEN: usize = 64> {
     d: PhantomData<(G, D)>,
 }
 
-impl<G: Group, D: Digest> Client<G, D> {
+impl<G: Group, D: Digest, const SALT_LEN: usize, const PRIVATE_KEY_LEN: usize> Client<G, D, SALT_LEN, PRIVATE_KEY_LEN> {
     pub fn new() -> Self {
         Client {
             d: PhantomData,
@@ -108,7 +108,7 @@ impl<G: Group, D: Digest> Client<G, D> {
     }
 
     pub fn sign_up(&self, username: String, password: String) -> SignupCredentials {
-        let mut salt = [0u8; 64];
+        let mut salt = [0u8; SALT_LEN];
         rand::rng().fill_bytes(&mut salt);
         let verifier = srp::Client::<G, D>::new()
             .compute_verifier(
@@ -126,7 +126,7 @@ impl<G: Group, D: Digest> Client<G, D> {
 
 
     pub fn login_hello(&self, username: String) -> (ClientHello, KeyPair) {
-        let mut private = [0u8; 64];
+        let mut private = [0u8; PRIVATE_KEY_LEN];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Client::<G, D>::new()
             .compute_public_ephemeral(&private);
@@ -171,11 +171,11 @@ impl<G: Group, D: Digest> Client<G, D> {
     }
 }
 
-pub struct Server<G: Group, D: Digest> {
+pub struct Server<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize = 64> {
     d: PhantomData<(G, D)>,
 }
 
-impl<G: Group, D: Digest> Server<G, D> {
+impl<G: Group, D: Digest, const PRIVATE_KEY_LEN: usize> Server<G, D, PRIVATE_KEY_LEN> {
     pub fn new() -> Self {
         Server {
             d: PhantomData,
@@ -183,7 +183,7 @@ impl<G: Group, D: Digest> Server<G, D> {
     }
 
     pub fn hello_reply(&self, salt: String, verifier: String) -> Result<(ServerHello, KeyPair), SimpleSrpError> {
-        let mut private = [0u8; 64];
+        let mut private = [0u8; PRIVATE_KEY_LEN];
         rand::rng().fill_bytes(&mut private);
         let public = srp::Server::<G, D>::new()
             .compute_public_ephemeral(&private, &hex::decode(verifier)?);
