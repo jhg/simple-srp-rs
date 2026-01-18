@@ -1,6 +1,6 @@
 [package]
 name = "simple-srp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simplify usage of srp crate"
 keywords = ["srp", "secure", "remote", "password", "authentication"]
 categories = ["authentication"]
