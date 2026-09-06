@@ -6,7 +6,7 @@ mod utils;
 pub use srp::groups;
 
 use std::marker::PhantomData;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use srp::{ClientVerifier, Group};
